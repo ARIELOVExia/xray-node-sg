@@ -1,10 +1,15 @@
 // Runtime wrapper: downloads official xray-core at runtime, runs VLESS+XHTTP
-// (packet-up) on an internal port, and serves the platform $PORT with a tiny
+// (stream-one) on an internal port, and serves the platform $PORT with a tiny
 // proxy that answers health checks (200 on /), relays plain HTTP requests on
 // WS_PATH to xray (XHTTP), and relays WebSocket upgrades on WS_PATH to xray.
+// EXPERIMENT 2026-11-09 on the SG backup node: XHTTP mode changed from
+// packet-up (the working baseline since 2026-11-08) to stream-one — one
+// long-lived upload stream + one download stream per session, instead of one
+// HTTP POST per packet, to cut per-packet overhead through the gateway.
+// If the real-phone test shows no improvement, revert to packet-up.
 // WS was tried first (2026-11-08): the AOZUMI/Cloudflare gateway hung every
-// WS upgrade with no 101 and no server-side trace, so XHTTP packet-up —
-// designed to pass through such gateways — is the transport now.
+// WS upgrade with no 101 and no server-side trace, so XHTTP — designed to
+// pass through such gateways — is the transport now.
 // No secrets are hard-coded: UUID and WS_PATH arrive as env vars.
 const { spawn, execFile } = require('child_process');
 const fs = require('fs');
@@ -88,7 +93,7 @@ async function main() {
       listen: '127.0.0.1',
       protocol: 'vless',
       settings: { clients: [{ id: UUID }], decryption: 'none' },
-      streamSettings: { network: 'xhttp', xhttpSettings: { path: WS_PATH, mode: 'packet-up' } },
+      streamSettings: { network: 'xhttp', xhttpSettings: { path: WS_PATH, mode: 'stream-one' } },
     }],
     outbounds: [{ protocol: 'freedom', tag: 'direct' }],
   };
